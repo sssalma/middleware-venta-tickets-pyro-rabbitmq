@@ -3,7 +3,7 @@ from typing import Optional
 
 
 @dataclass
-class ModeloCompra:
+class modelo_compra:
     ok: bool
     status: str
     motivo: str
