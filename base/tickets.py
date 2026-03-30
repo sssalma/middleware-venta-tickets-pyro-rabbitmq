@@ -31,4 +31,15 @@ class tickets:
         return self.repository.comprar_numerada(cliente_id, seat_id, request_id)
     
 
-    # AQUI PONER COMPRA NO NUMERADA
+    def comprar_no_numerada(self, cliente_id: str, request_id: str) -> modelo_compra:
+        # si no hay cliente_id o request_id:  falta info
+        if not cliente_id or not request_id:
+            return modelo_compra(
+                ok=False,
+                status="FAIL",
+                motivo="faltan_datos",
+                cliente_id=cliente_id,
+                request_id=request_id
+            )
+
+        return self.repository.comprar_no_numerada(cliente_id, request_id)
