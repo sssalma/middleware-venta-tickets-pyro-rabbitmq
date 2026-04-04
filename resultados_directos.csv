@@ -1,0 +1,2 @@
+benchmark,workers,limite,total,success,fail,tiempo_total_seg,throughput_ops_seg
+no_numerado,1,100,100,100,0,204.3155,0.49
