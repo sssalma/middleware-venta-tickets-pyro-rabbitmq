@@ -17,7 +17,7 @@ class RedisRepository:
 
         # 1. Si ya se procesó esta request, devolver lo mismo
         if self.redis.exists(clave_request):
-            datos = json.loads(self.redis.get(clave_request))
+            datos = json.loads(self.redis.get(clave_request))       # type: ignore
             return modelo_compra(
                 ok=datos["ok"],
                 status=datos["status"],
@@ -74,7 +74,7 @@ class RedisRepository:
 
         # Lógica de reserva atómica con contador de 0 a 20k
         tickets_vendidos = self.redis.incr("contador_tickets")
-        if tickets_vendidos <= 20000:
+        if tickets_vendidos <= 20000: # type: ignore
             self.redis.sadd("procesadas", request_id)
             return modelo_compra(True, "OK", "compra_exitosa", cliente_id, request_id)
         else:
