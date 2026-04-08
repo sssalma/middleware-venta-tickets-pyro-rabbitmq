@@ -5,7 +5,10 @@ import sys
 def enviar_benchmark(nombre_fichero):
     # Conexión a RabbitMQ
     try:
-        connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
+        connection = pika.BlockingConnection(pika.ConnectionParameters(
+            host='localhost',
+            heartbeat=600, 
+            blocked_connection_timeout=300))
         channel = connection.channel()
     except Exception as e:
         print(f"Error conectando a RabbitMQ: {e}")
