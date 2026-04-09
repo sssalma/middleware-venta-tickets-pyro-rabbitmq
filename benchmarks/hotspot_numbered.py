@@ -1,32 +1,23 @@
-import os
 import random
 
-def generar_benchmark_numerados():
-
-    total_lineas = 10000
-    total_asientos = 20000
-
-    # 5% de asientos (hotspot)
-    num_hot = int(total_asientos * 0.05)  # 1000 asientos
-    hot_seats = list(range(1, num_hot + 1))
-    cold_seats = list(range(num_hot + 1, total_asientos + 1))
-
-    with open('benchmarks/bm_hotspot_numerados.txt', 'w') as f:
-        f.write("# Concert Ticket Benchmark  Numbered Seats\n")
-        f.write("# Seats: 1..20000\n")
-        f.write("# 80% of requests target 5% of seats\n")
-        f.write("# Format: BUY <client_id> <seat_id> <request_id>\n\n")
-
-        for i in range(1, total_lineas + 1):
-            # 80% hotspot
-            if random.random() < 0.8:
-                seat_id = random.choice(hot_seats)
+def generar_hotspot(filename="benchmarks/bm_hotspot.txt", total_req=60000):
+    total_seats = 20000
+    # 5% de los asientos = 1,000 asientos
+    hot_seats_range = int(total_seats * 0.05) 
+    
+    with open(filename, "w") as f:
+        for i in range(total_req):
+            client_id = f"user{random.randint(1, 10000)}"
+            request_id = f"{i}"
+            
+            # 80% de probabilidad de elegir uno de los 1,000 asientos "hot" y 20% de elegir uno de los 19,000 restantes
+            if random.random() < 0.80:
+                seat_id = random.randint(1, hot_seats_range)
             else:
-                seat_id = random.choice(cold_seats)
-
-            f.write(f"BUY user{i:05d} {seat_id} {i:05d}\n")
-
-    print("bm_hotspot_numerados.txt generado.")
+                seat_id = random.randint(hot_seats_range + 1, total_seats)
+                
+            f.write(f"BUY {client_id} {seat_id} {request_id}\n")
+    print(f"Benchmark generado: {filename} con {total_req} peticiones.")
 
 if __name__ == "__main__":
-    generar_benchmark_numerados()
+    generar_hotspot()

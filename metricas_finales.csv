@@ -1,0 +1,11 @@
+modelo,benchmark,workers,tiempo,throughput,success,fail
+indirecto,benchmark_numbered_60000.txt,4,36.55,711.31,20000,5997
+indirecto,benchmark_unnumbered_20000.txt,1,151.08,132.38,20000,0
+indirecto,benchmark_unnumbered_20000.txt,2,80.78,247.60,20000,0
+indirecto,benchmark_unnumbered_20000.txt,4,46.83,427.08,20000,0
+indirecto,bm_hotspot.txt,1,193.03,310.84,10008,49992
+indirecto,bm_hotspot.txt,2,116.36,515.63,10008,49992
+indirecto,bm_hotspot.txt,4,76.56,783.66,10008,49992
+indirecto,bm_hotspot.txt,8,56.16,1068.39,10008,49992
+indirecto,bm_hotspot.txt,10,52.24,1148.56,10008,49992
+indirecto,bm_hotspot.txt,15,49.43,1213.92,10008,49992
