@@ -6,7 +6,7 @@ url = "http://localhost:8080/buy_numbered"
 datos = {
     "cliente_id": "c1",
     "seat_id": 10,
-    "request_id": "r100"
+    "request_id": "r101"
 }
 
 datos_json = json.dumps(datos).encode("utf-8")

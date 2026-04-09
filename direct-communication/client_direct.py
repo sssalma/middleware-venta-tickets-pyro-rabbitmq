@@ -1,7 +1,23 @@
+import csv
 import json
 import time
-import csv
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from urllib import request, error
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+ALLOWED_CONCURRENCY = {10, 20, 50}
+CSV_HEADERS = [
+    "benchmark",
+    "workers",
+    "limite",
+    "concurrencia",
+    "total",
+    "success",
+    "fail",
+    "tiempo_total_seg",
+    "throughput_ops_seg"
+]
 
 
 def enviar_post(url, datos):
@@ -15,7 +31,7 @@ def enviar_post(url, datos):
     )
 
     try:
-        with request.urlopen(req) as response:
+        with request.urlopen(req, timeout=10) as response:
             cuerpo = response.read().decode("utf-8")
             return json.loads(cuerpo)
 
@@ -23,7 +39,7 @@ def enviar_post(url, datos):
         cuerpo = e.read().decode("utf-8")
         try:
             return json.loads(cuerpo)
-        except:
+        except Exception:
             return {
                 "ok": False,
                 "status": "FAIL",
@@ -43,32 +59,41 @@ def guardar_resultado_csv(nombre_fichero, fila, escribir_cabecera=False):
         writer = csv.writer(f)
 
         if escribir_cabecera:
-            writer.writerow([
-                "benchmark",
-                "workers",
-                "limite",
-                "total",
-                "success",
-                "fail",
-                "tiempo_total_seg",
-                "throughput_ops_seg"
-            ])
+            writer.writerow(CSV_HEADERS)
 
         writer.writerow(fila)
 
 
-def ejecutar_benchmark_numerado(ruta_fichero, base_url, limite=None, progreso_cada=100):
-    url = f"{base_url}/buy_numbered"
+def quiere_guardar_csv(respuesta):
+    respuesta_normalizada = respuesta.strip().lower().replace("í", "i")
+    return respuesta_normalizada in {"s", "si", "y", "yes"}
 
-    total = 0
-    success = 0
-    fail = 0
 
-    inicio = time.time()
+def leer_concurrencia():
+    while True:
+        concurrencia_input = input("Nivel de concurrencia (10, 20 o 50; Enter = 20): ").strip()
+
+        if not concurrencia_input:
+            return 20
+
+        try:
+            concurrencia = int(concurrencia_input)
+        except ValueError:
+            print("Valor no valido. Solo se permite 10, 20 o 50.")
+            continue
+
+        if concurrencia in ALLOWED_CONCURRENCY:
+            return concurrencia
+
+        print("Valor no valido. Solo se permite 10, 20 o 50.")
+
+
+def cargar_peticiones_numerado(ruta_fichero, limite=None):
+    peticiones = []
 
     with open(ruta_fichero, "r", encoding="utf-8") as f:
         for linea in f:
-            if limite is not None and total >= limite:
+            if limite is not None and len(peticiones) >= limite:
                 break
 
             linea = linea.strip()
@@ -83,56 +108,21 @@ def ejecutar_benchmark_numerado(ruta_fichero, base_url, limite=None, progreso_ca
 
             _, cliente_id, seat_id, request_id = partes
 
-            datos = {
+            peticiones.append({
                 "cliente_id": cliente_id,
                 "seat_id": int(seat_id),
                 "request_id": request_id
-            }
+            })
 
-            resultado = enviar_post(url, datos)
-
-            total += 1
-            if resultado.get("status") in ["SUCCESS", "OK"]:
-                success += 1
-            else:
-                fail += 1
-
-            if progreso_cada and total % progreso_cada == 0:
-                print(f"Procesadas {total} peticiones...")
-
-    fin = time.time()
-    tiempo_total = fin - inicio
-    throughput = total / tiempo_total if tiempo_total > 0 else 0
-
-    print("\n=== RESULTADOS BENCHMARK NUMERADO ===")
-    print(f"Total peticiones: {total}")
-    print(f"SUCCESS: {success}")
-    print(f"FAIL: {fail}")
-    print(f"Tiempo total: {tiempo_total:.4f} segundos")
-    print(f"Throughput: {throughput:.2f} peticiones/segundo")
-
-    return {
-        "benchmark": "numerado",
-        "total": total,
-        "success": success,
-        "fail": fail,
-        "tiempo_total": tiempo_total,
-        "throughput": throughput
-    }
+    return peticiones
 
 
-def ejecutar_benchmark_no_numerado(ruta_fichero, base_url, limite=None, progreso_cada=100):
-    url = f"{base_url}/buy_unnumbered"
-
-    total = 0
-    success = 0
-    fail = 0
-
-    inicio = time.time()
+def cargar_peticiones_no_numerado(ruta_fichero, limite=None):
+    peticiones = []
 
     with open(ruta_fichero, "r", encoding="utf-8") as f:
         for linea in f:
-            if limite is not None and total >= limite:
+            if limite is not None and len(peticiones) >= limite:
                 break
 
             linea = linea.strip()
@@ -147,27 +137,40 @@ def ejecutar_benchmark_no_numerado(ruta_fichero, base_url, limite=None, progreso
 
             _, cliente_id, request_id = partes
 
-            datos = {
+            peticiones.append({
                 "cliente_id": cliente_id,
                 "request_id": request_id
-            }
+            })
 
-            resultado = enviar_post(url, datos)
+    return peticiones
 
-            total += 1
+
+def ejecutar_benchmark_paralelo(url, peticiones, benchmark, concurrencia=20, progreso_cada=100):
+    total = len(peticiones)
+    success = 0
+    fail = 0
+
+    inicio = time.time()
+
+    with ThreadPoolExecutor(max_workers=concurrencia) as executor:
+        futuros = [executor.submit(enviar_post, url, datos) for datos in peticiones]
+
+        for i, futuro in enumerate(as_completed(futuros), start=1):
+            resultado = futuro.result()
+
             if resultado.get("status") in ["SUCCESS", "OK"]:
                 success += 1
             else:
                 fail += 1
 
-            if progreso_cada and total % progreso_cada == 0:
-                print(f"Procesadas {total} peticiones...")
+            if progreso_cada and i % progreso_cada == 0:
+                print(f"Completadas {i}/{total} peticiones...")
 
     fin = time.time()
     tiempo_total = fin - inicio
     throughput = total / tiempo_total if tiempo_total > 0 else 0
 
-    print("\n=== RESULTADOS BENCHMARK NO NUMERADO ===")
+    print(f"\n=== RESULTADOS BENCHMARK {benchmark.upper()} ===")
     print(f"Total peticiones: {total}")
     print(f"SUCCESS: {success}")
     print(f"FAIL: {fail}")
@@ -175,7 +178,7 @@ def ejecutar_benchmark_no_numerado(ruta_fichero, base_url, limite=None, progreso
     print(f"Throughput: {throughput:.2f} peticiones/segundo")
 
     return {
-        "benchmark": "no_numerado",
+        "benchmark": benchmark,
         "total": total,
         "success": success,
         "fail": fail,
@@ -187,8 +190,8 @@ def ejecutar_benchmark_no_numerado(ruta_fichero, base_url, limite=None, progreso
 if __name__ == "__main__":
     BASE_URL = "http://localhost:8080"
 
-    RUTA_NUMERADO = "benchmarks/benchmark_numbered_60000.txt"
-    RUTA_NO_NUMERADO = "benchmarks/benchmark_unnumbered_20000.txt"
+    RUTA_NUMERADO = PROJECT_ROOT / "benchmarks" / "benchmark_numbered_60000.txt"
+    RUTA_NO_NUMERADO = PROJECT_ROOT / "benchmarks" / "benchmark_unnumbered_20000.txt"
 
     print("¿Qué benchmark quieres ejecutar?")
     print("1 - Numerado")
@@ -201,25 +204,42 @@ if __name__ == "__main__":
     workers_input = input("Número de workers activos: ").strip()
     workers = workers_input if workers_input else "desconocido"
 
+    concurrencia = leer_concurrencia()
+
     guardar_csv = input("¿Guardar resultado en CSV? (s/n): ").strip().lower()
 
     if opcion == "1":
-        resultado = ejecutar_benchmark_numerado(RUTA_NUMERADO, BASE_URL, limite=limite)
+        url = f"{BASE_URL}/buy_numbered"
+        peticiones = cargar_peticiones_numerado(RUTA_NUMERADO, limite=limite)
+        resultado = ejecutar_benchmark_paralelo(
+            url=url,
+            peticiones=peticiones,
+            benchmark="numerado",
+            concurrencia=concurrencia
+        )
 
     elif opcion == "2":
-        resultado = ejecutar_benchmark_no_numerado(RUTA_NO_NUMERADO, BASE_URL, limite=limite)
+        url = f"{BASE_URL}/buy_unnumbered"
+        peticiones = cargar_peticiones_no_numerado(RUTA_NO_NUMERADO, limite=limite)
+        resultado = ejecutar_benchmark_paralelo(
+            url=url,
+            peticiones=peticiones,
+            benchmark="no_numerado",
+            concurrencia=concurrencia
+        )
 
     else:
         print("Opción no válida.")
-        exit()
+        raise SystemExit(1)
 
-    if guardar_csv == "s":
-        nombre_csv = "resultados_directos.csv"
+    if quiere_guardar_csv(guardar_csv):
+        nombre_csv = PROJECT_ROOT / "resultados_directos.csv"
 
         fila = [
             resultado["benchmark"],
             workers,
             limite if limite is not None else "completo",
+            concurrencia,
             resultado["total"],
             resultado["success"],
             resultado["fail"],
@@ -227,11 +247,7 @@ if __name__ == "__main__":
             f"{resultado['throughput']:.2f}"
         ]
 
-        try:
-            with open(nombre_csv, "r", encoding="utf-8"):
-                existe = True
-        except FileNotFoundError:
-            existe = False
+        existe = nombre_csv.exists() and nombre_csv.stat().st_size > 0
 
         guardar_resultado_csv(
             nombre_csv,
@@ -240,3 +256,5 @@ if __name__ == "__main__":
         )
 
         print(f"Resultado guardado en {nombre_csv}")
+    else:
+        print("Resultado no guardado en CSV.")
