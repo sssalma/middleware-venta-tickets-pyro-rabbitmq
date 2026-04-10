@@ -1,6 +1,12 @@
 import pika
 import json
 import time
+import sys
+import os
+
+# Esto añade la carpeta raíz del proyecto al camino de búsqueda de Python
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from base.redis_logica import RedisRepository
 from base.tickets import tickets
 
