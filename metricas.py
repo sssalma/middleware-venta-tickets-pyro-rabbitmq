@@ -71,7 +71,7 @@ def run_experiment_indirect(benchmark_path, num_workers):
     success = 0
     fail = 0
     
-    for key in all_requests_keys:
+    for key in all_requests_keys:  
         val = r.get(key)
         if val:
             datos = json.loads(val)
