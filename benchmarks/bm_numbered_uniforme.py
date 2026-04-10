@@ -11,7 +11,7 @@ def generar_distribuido(filename="benchmarks/bm_uniforme.txt", total_req=60000):
     with open(filename, "w") as f:
         for i in range(total_req):
             client_id = f"user{random.randint(1, 10000)}"
-            request_id = f"req_dist_{i}"
+            request_id = f"{i}"
             
             # Distribución UNIFORME: todos los asientos tienen la misma probabilidad
             seat_id = random.randint(1, total_seats)
