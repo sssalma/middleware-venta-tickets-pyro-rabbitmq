@@ -5,12 +5,14 @@ import csv
 import Pyro4
 from concurrent.futures import ThreadPoolExecutor
 
-# Añadir la ruta raíz para importar desde 'base' si es necesario
+#para poder importar archivos de del dir padre
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
 def procesar_linea(args):
-    """Función que será ejecutada por cada hilo."""
+    """
+    Realiza la invocación RPC al worker asignado.
+    """
     i, line, workers = args
     num_workers = len(workers)
     parts = line.strip().split()
@@ -18,10 +20,10 @@ def procesar_linea(args):
     if not parts:
         return False
 
-    # Round Robin entre workers
+    #Client side load balancing round-robin
     worker = workers[i % num_workers]
 
-    try:
+    try:# Mapeo según el tipo de benchmark (No Numerado vs Numerado)
         if len(parts) == 3:  # Unnumbered
             res = worker.comprar(parts[1], parts[2])
         elif len(parts) == 4:  # Numbered
@@ -45,11 +47,9 @@ def guardar_metricas_csv(
     csv_file = os.path.join(os.path.dirname(__file__), "..", "metricas_finales.csv")
 ):
     """
-    Guarda los resultados en metricas_finales.csv.
-    Si el archivo no existe, escribe la cabecera.
+    Guarda los resultados en el CSV global para la generación de gráficas.
     """
     file_exists = os.path.isfile(csv_file)
-
     with open(csv_file, "a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
 
@@ -80,7 +80,7 @@ def run_benchmark_paralelo(file_path, max_hilos=50):
         print(f"Error: El archivo {file_path} no existe.")
         return
 
-    try:
+    try:# Localización de los servidores a través del Name Server
         ns = Pyro4.locateNS(host="127.0.0.1")
         servicios = ns.list(prefix="tickets.worker.")
         if not servicios:
@@ -88,7 +88,6 @@ def run_benchmark_paralelo(file_path, max_hilos=50):
             return
 
         print(f"Detectados {len(servicios)} workers.")
-
         # Creamos los proxies una sola vez
         workers = [Pyro4.Proxy(uri) for uri in servicios.values()]
 
@@ -96,6 +95,7 @@ def run_benchmark_paralelo(file_path, max_hilos=50):
         print(f"Error Pyro: {e}")
         return
 
+    # Preparación de la carga
     with open(file_path, "r", encoding="utf-8") as f:
         lines = [l for l in f.readlines() if l.startswith("BUY")]
 
@@ -103,10 +103,8 @@ def run_benchmark_paralelo(file_path, max_hilos=50):
 
     start_time = time.time()
 
-    # Preparamos los argumentos para cada tarea
+    # Ejecución masiva
     tareas = [(i, line, workers) for i, line in enumerate(lines)]
-
-    # Ejecución concurrente
     with ThreadPoolExecutor(max_workers=max_hilos) as executor:
         resultados = list(executor.map(procesar_linea, tareas))
 
