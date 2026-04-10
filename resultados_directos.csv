@@ -2,3 +2,4 @@ benchmark,workers,limite,concurrencia,total,success,fail,tiempo_total_seg,throug
 no_numerado,4,100,50,100,100,0,4.1769,23.94
 numerado,4,40,50,40,1,39,2.1493,18.61
 no_numerado,4,10000,50,10000,10000,0,406.2862,24.61
+no_numerado,4,500,50,500,0,500,41.0828,12.17
