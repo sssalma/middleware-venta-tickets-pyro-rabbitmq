@@ -23,3 +23,15 @@ indirecto,benchmark_numbered_60000.txt,4,35.09,740.93,20000,5997
 indirecto,benchmark_numbered_60000.txt,8,25.09,1036.09,20000,5997
 indirecto,benchmark_numbered_60000.txt,10,23.40,1110.75,20000,5997
 indirecto,benchmark_numbered_60000.txt,15,21.03,1236.41,20000,5997
+indirecto,benchmark_unnumbered_20000.txt,2,3.34,0.00,0,0
+indirecto,benchmark_unnumbered_20000.txt,2,3.37,5937.32,20000,0
+indirecto,benchmark_numbered_60000.txt,2,3.67,5456.60,20000,0
+indirecto,benchmark_numbered_60000.txt,2,3.67,5449.60,20000,0
+indirecto,benchmark_numbered_60000.txt,4,3.69,5421.36,20000,0
+indirecto,benchmark_numbered_60000.txt,8,3.67,5452.39,20000,0
+indirecto,benchmark_numbered_60000.txt,8,3.72,5377.19,20000,0
+indirecto,benchmark_numbered_60000.txt,1,3.75,5326.77,20000,0
+indirecto,benchmark_numbered_60000.txt,1,3.65,5474.36,20000,0
+indirecto,benchmark_numbered_60000.txt,1,243.50,82.14,20000,0
+indirecto,benchmark_numbered_60000.txt,4,91.73,218.04,20000,0
+indirecto,benchmark_numbered_60000.txt,4,51.85,385.73,20000,0

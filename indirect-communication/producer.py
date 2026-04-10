@@ -3,10 +3,16 @@ import json
 import sys
 
 def enviar_benchmark(nombre_fichero):
-    # Conexión a RabbitMQ
+    # IP del portátil 
+    host_servidor = '192.168.1.131' 
+    
+    # Credenciales del nuevo usuario
+    credentials = pika.PlainCredentials('admin', 'admin')
+
     try:
         connection = pika.BlockingConnection(pika.ConnectionParameters(
-            host='localhost',
+            host=host_servidor,
+            credentials=credentials, # <--- Añadir esto
             heartbeat=600, 
             blocked_connection_timeout=300))
         channel = connection.channel()

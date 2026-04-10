@@ -7,23 +7,28 @@ import json
 import os
 
 # Configuración
-RABBIT_HOST = 'localhost'
+RABBIT_HOST = '192.168.1.131'
 QUEUE_NAME = 'cola_tickets'
-REDIS_HOST = 'localhost'
+REDIS_HOST = '192.168.1.131'
 REDIS_PORT = 6379
 
 def get_rabbit_message_count():
-    """Consulta cuántos mensajes quedan físicamente en la cola de RabbitMQ de forma pasiva."""
     try:
-        connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBIT_HOST))
+        # Usa las credenciales que creaste (admin/admin) si es necesario
+        credentials = pika.PlainCredentials('admin', 'admin')
+        connection = pika.BlockingConnection(pika.ConnectionParameters(
+            host=RABBIT_HOST, 
+            credentials=credentials
+        ))
         channel = connection.channel()
-        # passive=True permite consultar la cola sin crearla ni borrarla
         queue = channel.queue_declare(queue=QUEUE_NAME, durable=True, passive=True)
         count = queue.method.message_count
         connection.close()
         return count
-    except Exception:
-        return 0
+    except Exception as e:
+        # Esto te dirá por qué el cronómetro se para antes de tiempo
+        print(f"Error consultando RabbitMQ: {e}")
+        return -1 # Devolvemos -1 para que el bucle no crea que es 0
 
 def run_experiment_indirect(benchmark_path, num_workers):
     print(f"\n{'='*50}")
@@ -45,21 +50,22 @@ def run_experiment_indirect(benchmark_path, num_workers):
     # Ejecutamos el script producer.py pasándole el benchmark
     subprocess.run(["python", "indirect-communication/producer.py", benchmark_path], env=env_vars)
     
-    # 3. Monitoreo de la cola
+    # ... dentro de run_experiment_indirect ...
     print("[2/3] Procesando... (Esperando a que la cola se vacíe)")
-    last_count = -1
     while True:
         count = get_rabbit_message_count()
-        if count == 0:
-            # Margen de seguridad para que los workers terminen de escribir en Redis
+        
+        if count > 0:
+            print(f"    > Mensajes pendientes: {count}    ", end="\r")
+        elif count == 0:
+            print("    > Cola vacía. Esperando margen de seguridad...")
             time.sleep(2.0)
             if get_rabbit_message_count() == 0: 
                 break
+        else:
+            print("    > Esperando reconexión con RabbitMQ...          ", end="\r")
         
-        if count != last_count:
-            print(f"    > Mensajes pendientes: {count}    ", end="\r")
-            last_count = count
-        time.sleep(0.5)
+        time.sleep(1.0) # Aumenta un poco el tiempo entre consultas
     
     end_time = time.time()
     total_time = end_time - start_time
