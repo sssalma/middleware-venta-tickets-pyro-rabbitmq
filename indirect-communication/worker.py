@@ -25,7 +25,7 @@ def procesar_compra(ch, method, properties, body):
 
     print(f"Request {data['request_id']}: {resultado.status} - {resultado.motivo}")
     # Confirmación manual a RabbitMQ para detectar si falla una venta y reintentarla
-    time.sleep(0.01)
+    #time.sleep(0.01)
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
 def iniciar_worker():
