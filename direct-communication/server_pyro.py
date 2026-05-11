@@ -51,8 +51,8 @@ def main():
     worker_id = sys.argv[1]
     try:
         # nathost=127.0.0.1 asegura que las URIs sean accesibles localmente
-        daemon = Pyro4.Daemon(host="0.0.0.0", nathost="127.0.0.1")
-        ns = Pyro4.locateNS(host="127.0.0.1")
+        daemon = Pyro4.Daemon(host="0.0.0.0", nathost="192.168.1.131") #ip host
+        ns = Pyro4.locateNS(host="192.168.1.131")
         worker = TicketWorker(worker_id)
         uri = daemon.register(worker)
         nombre_servidor = f"tickets.worker.{worker_id}"

@@ -81,7 +81,7 @@ def run_benchmark_paralelo(file_path, max_hilos=50):
         return
 
     try:# Localización de los servidores a través del Name Server
-        ns = Pyro4.locateNS(host="127.0.0.1")
+        ns = Pyro4.locateNS(host="192.168.1.131")
         servicios = ns.list(prefix="tickets.worker.")
         if not servicios:
             print("No se encontraron Workers.")

@@ -23,7 +23,7 @@ class TicketFrontend(object):
         if not force and (now - self.last_refresh) < self.refresh_interval:
             return
         try:
-            ns = Pyro4.locateNS(host="127.0.0.1")
+            ns = Pyro4.locateNS(host="192.168.1.131") # ip host
             servicios = ns.list(prefix="tickets.worker.")
             nuevas_uris = list(servicios.values())
         except Exception:
@@ -118,8 +118,8 @@ def main():
     """Inicia y registra en el NameServ el Daemon del Frontend,
     como el punto de entrada único para todos los clientes directos."""
     try:
-        daemon = Pyro4.Daemon(host="0.0.0.0", nathost="127.0.0.1")
-        ns = Pyro4.locateNS(host="127.0.0.1")
+        daemon = Pyro4.Daemon(host="0.0.0.0", nathost="192.168.1.131") #ip portatil (host)
+        ns = Pyro4.locateNS(host="ping 192.168.1.131")
 
         frontend = TicketFrontend()
         uri = daemon.register(frontend)
