@@ -3,8 +3,9 @@ import os
 
 def generar_distribuido(filename="benchmarks/bm_uniforme.txt", total_req=60000):
     # Asegurar que existe la carpeta
-    if not os.path.exists('benchmarks'):
-        os.makedirs('benchmarks')
+    dirpath = os.path.dirname(filename)
+    if dirpath and not os.path.exists(dirpath):
+        os.makedirs(dirpath)
         
     total_seats = 20000
     

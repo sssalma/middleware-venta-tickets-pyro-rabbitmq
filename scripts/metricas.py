@@ -6,6 +6,8 @@ import sys
 import json
 import os
 
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 # Configuración
 RABBIT_HOST = '192.168.1.131'
 QUEUE_NAME = 'cola_tickets'
@@ -45,10 +47,10 @@ def run_experiment_indirect(benchmark_path, num_workers):
     
     # Configuramos el entorno para asegurar que el productor encuentre los módulos
     env_vars = os.environ.copy()
-    env_vars["PYTHONPATH"] = os.getcwd()
+    env_vars["PYTHONPATH"] = ROOT_DIR
     
     # Ejecutamos el script producer.py pasándole el benchmark
-    subprocess.run(["python", "indirect-communication/producer.py", benchmark_path], env=env_vars)
+    subprocess.run(["python", os.path.join(ROOT_DIR, "indirect-communication", "producer.py"), benchmark_path], env=env_vars)
     
     # ... dentro de run_experiment_indirect ...
     print("[2/3] Procesando... (Esperando a que la cola se vacíe)")
@@ -106,7 +108,7 @@ def run_experiment_indirect(benchmark_path, num_workers):
     print("*"*30)
 
     # Guardar en un CSV para gráficas
-    csv_file = "metricas_finales.csv"
+    csv_file = os.path.join(ROOT_DIR, "metricas_finales.csv")
     file_exists = os.path.isfile(csv_file)
     with open(csv_file, "a") as f:
         if not file_exists:

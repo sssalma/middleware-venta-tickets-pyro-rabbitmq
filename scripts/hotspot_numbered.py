@@ -1,6 +1,10 @@
 import random
+import os
 
 def generar_hotspot(filename="benchmarks/bm_hotspot.txt", total_req=60000):
+    dirpath = os.path.dirname(filename)
+    if dirpath and not os.path.exists(dirpath):
+        os.makedirs(dirpath)
     total_seats = 20000
     # 5% de los asientos = 1,000 asientos
     hot_seats_range = int(total_seats * 0.05) 

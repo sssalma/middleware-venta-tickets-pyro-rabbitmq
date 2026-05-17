@@ -30,7 +30,7 @@ class TicketWorker(object):
         if seat_id is None:
             resultado = self.servicio.comprar_no_numerada(client_id, request_id)
         else:
-            resultado = self.servicio.comprar_numerada(client_id, seat_id, request_id)
+            resultado = self.servicio.comprar_numerada(client_id, int(seat_id), request_id)
         if self.request_count % 500 == 0:
             print(
                 f"[Worker {self.worker_id}] "

@@ -103,7 +103,7 @@ class TicketFrontend(object):
                 if seat_id is None:
                     return worker_proxy.comprar(client_id, request_id)
                 else:
-                    return worker_proxy.comprar(client_id, request_id, seat_id)
+                    return worker_proxy.comprar(client_id, request_id, int(seat_id))
 
             except Exception as e:
                 ultimo_error = e
