@@ -2,6 +2,9 @@ import time
 import threading
 import Pyro4
 
+Pyro4.config.SERVERTYPE = "thread"
+Pyro4.config.THREADPOOL_SIZE = 100
+Pyro4.config.THREADPOOL_SIZE_MIN = 20
 
 @Pyro4.expose
 @Pyro4.behavior(instance_mode="single")
@@ -23,7 +26,7 @@ class TicketFrontend(object):
         if not force and (now - self.last_refresh) < self.refresh_interval:
             return
         try:
-            ns = Pyro4.locateNS(host="192.168.1.131") # ip host
+            ns = Pyro4.locateNS(host="192.168.1.131", port=9090) # ip host
             servicios = ns.list(prefix="tickets.worker.")
             nuevas_uris = list(servicios.values())
         except Exception:
@@ -103,7 +106,8 @@ class TicketFrontend(object):
                 if seat_id is None:
                     return worker_proxy.comprar(client_id, request_id)
                 else:
-                    return worker_proxy.comprar(client_id, request_id, int(seat_id))
+                    seat_id = int(seat_id)
+                    return worker_proxy.comprar(client_id, request_id, seat_id)
 
             except Exception as e:
                 ultimo_error = e
@@ -119,7 +123,7 @@ def main():
     como el punto de entrada único para todos los clientes directos."""
     try:
         daemon = Pyro4.Daemon(host="0.0.0.0", nathost="192.168.1.131") #ip portatil (host)
-        ns = Pyro4.locateNS(host="ping 192.168.1.131")
+        ns = Pyro4.locateNS(host="192.168.1.131", port=9090)
 
         frontend = TicketFrontend()
         uri = daemon.register(frontend)

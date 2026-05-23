@@ -6,80 +6,105 @@ import sys
 import json
 import os
 
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-# Configuración
-RABBIT_HOST = '192.168.1.131'
-QUEUE_NAME = 'cola_tickets'
-REDIS_HOST = '192.168.1.131'
+RABBIT_HOST = "192.168.1.131"
+QUEUE_NAME = "cola_tickets"
+REDIS_HOST = "192.168.1.131"
 REDIS_PORT = 6379
+
 
 def get_rabbit_message_count():
     try:
-        # Usa las credenciales que creaste (admin/admin) si es necesario
-        credentials = pika.PlainCredentials('admin', 'admin')
-        connection = pika.BlockingConnection(pika.ConnectionParameters(
-            host=RABBIT_HOST, 
-            credentials=credentials
-        ))
+        credentials = pika.PlainCredentials("admin", "admin")
+        connection = pika.BlockingConnection(
+            pika.ConnectionParameters(
+                host=RABBIT_HOST,
+                credentials=credentials
+            )
+        )
         channel = connection.channel()
-        queue = channel.queue_declare(queue=QUEUE_NAME, durable=True, passive=True)
+        queue = channel.queue_declare(
+            queue=QUEUE_NAME,
+            durable=True,
+            passive=True
+        )
         count = queue.method.message_count
         connection.close()
         return count
+
     except Exception as e:
-        # Esto te dirá por qué el cronómetro se para antes de tiempo
         print(f"Error consultando RabbitMQ: {e}")
-        return -1 # Devolvemos -1 para que el bucle no crea que es 0
+        return -1
+
+
+def contar_lineas_benchmark(benchmark_path):
+    with open(benchmark_path, "r", encoding="utf-8") as f:
+        return sum(1 for line in f if line.startswith("BUY"))
+
 
 def run_experiment_indirect(benchmark_path, num_workers):
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print(f"EXPERIMENTO INDIRECTO (RabbitMQ) - Workers: {num_workers}")
     print(f"Benchmark: {benchmark_path}")
-    print(f"{'='*50}")
-    
-    # 1. Conexión a Redis
-    r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0, decode_responses=True)
-    
-    # 2. Inicio del cronómetro y ejecución del Producer
+    print(f"{'=' * 50}")
+
+    total_benchmark_ops = contar_lineas_benchmark(benchmark_path)
+
+    r = redis.Redis(
+        host=REDIS_HOST,
+        port=REDIS_PORT,
+        db=0,
+        decode_responses=True
+    )
+
     print("[1/3] Lanzando Producer y enviando peticiones...")
+
     start_time = time.time()
-    
-    # Configuramos el entorno para asegurar que el productor encuentre los módulos
+
     env_vars = os.environ.copy()
-    env_vars["PYTHONPATH"] = ROOT_DIR
-    
-    # Ejecutamos el script producer.py pasándole el benchmark
-    subprocess.run(["python", os.path.join(ROOT_DIR, "indirect-communication", "producer.py"), benchmark_path], env=env_vars)
-    
-    # ... dentro de run_experiment_indirect ...
+    env_vars["PYTHONPATH"] = os.getcwd()
+
+    subprocess.run(
+        ["python", "indirect-communication/producer.py", benchmark_path],
+        env=env_vars
+    )
+
+    send_end_time = time.time()
+    tiempo_envio = send_end_time - start_time
+
+    print(f"[Producer] Tiempo Fire-and-Forget: {tiempo_envio:.2f} seg")
+
     print("[2/3] Procesando... (Esperando a que la cola se vacíe)")
+
     while True:
         count = get_rabbit_message_count()
-        
+
         if count > 0:
             print(f"    > Mensajes pendientes: {count}    ", end="\r")
+
         elif count == 0:
             print("    > Cola vacía. Esperando margen de seguridad...")
             time.sleep(2.0)
-            if get_rabbit_message_count() == 0: 
+
+            if get_rabbit_message_count() == 0:
                 break
+
         else:
             print("    > Esperando reconexión con RabbitMQ...          ", end="\r")
-        
-        time.sleep(1.0) # Aumenta un poco el tiempo entre consultas
-    
-    end_time = time.time()
-    total_time = end_time - start_time
 
-    # 4. Cálculo de métricas consultando directamente a Redis
+        time.sleep(0.2)
+
+    end_time = time.time()
+
+    tiempo_total = end_time - start_time
+    tiempo_procesamiento = end_time - send_end_time
+
     print("\n[3/3] Recopilando métricas de Redis...")
-    
+
     all_requests_keys = r.keys("request:*")
     success = 0
     fail = 0
-    
-    for key in all_requests_keys:  
+
+    for key in all_requests_keys:
         val = r.get(key)
         if val:
             datos = json.loads(val)
@@ -88,32 +113,53 @@ def run_experiment_indirect(benchmark_path, num_workers):
             else:
                 fail += 1
 
-    # Caso especial: tickets no numerados
     no_num_success = r.scard("procesadas")
+
     if no_num_success > 0:
         success = no_num_success
         intentos = int(r.get("contador_tickets") or 0)
         fail = max(0, intentos - success)
 
     total_ops = success + fail
-    throughput = total_ops / total_time if total_time > 0 else 0
 
-    # Imprimir resultados por pantalla
-    print("\n" + "*"*30)
-    print(f"TIEMPO TOTAL:  {total_time:.2f} seg")
-    print(f"THROUGHPUT:    {throughput:.2f} ops/seg")
-    print(f"SUCCESS:       {success}")
-    print(f"FAIL:          {fail}")
-    print(f"TOTAL:         {total_ops}")
-    print("*"*30)
+    throughput_total = total_ops / tiempo_total if tiempo_total > 0 else 0
+    throughput_envio = total_benchmark_ops / tiempo_envio if tiempo_envio > 0 else 0
 
-    # Guardar en un CSV para gráficas
-    csv_file = os.path.join(ROOT_DIR, "metricas_finales.csv")
+    print("\n" + "*" * 40)
+    print(f"TIEMPO ENVÍO FIRE-AND-FORGET: {tiempo_envio:.2f} seg")
+    print(f"TIEMPO PROCESAMIENTO:         {tiempo_procesamiento:.2f} seg")
+    print(f"TIEMPO TOTAL END-TO-END:      {tiempo_total:.2f} seg")
+    print(f"THROUGHPUT ENVÍO:             {throughput_envio:.2f} ops/seg")
+    print(f"THROUGHPUT TOTAL:             {throughput_total:.2f} ops/seg")
+    print(f"SUCCESS:                      {success}")
+    print(f"FAIL:                         {fail}")
+    print(f"TOTAL PROCESADAS:             {total_ops}")
+    print("*" * 40)
+
+    csv_file = "metricas_finales.csv"
     file_exists = os.path.isfile(csv_file)
-    with open(csv_file, "a") as f:
+
+    with open(csv_file, "a", encoding="utf-8") as f:
         if not file_exists:
-            f.write("modelo,benchmark,workers,tiempo,throughput,success,fail\n")
-        f.write(f"indirecto,{os.path.basename(benchmark_path)},{num_workers},{total_time:.2f},{throughput:.2f},{success},{fail}\n")
+            f.write(
+                "modelo,benchmark,workers,tiempo_envio,tiempo_total,"
+                "throughput_envio,throughput_total,success,fail\n"
+            )
+
+        f.write(
+            f"indirecto,"
+            f"{os.path.basename(benchmark_path)},"
+            f"{num_workers},"
+            f"{tiempo_envio:.2f},"
+            f"{tiempo_total:.2f},"
+            f"{throughput_envio:.2f},"
+            f"{throughput_total:.2f},"
+            f"{success},"
+            f"{fail}\n"
+        )
+
+    print("Métricas guardadas en metricas_finales.csv")
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:

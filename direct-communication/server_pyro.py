@@ -3,6 +3,10 @@ import os
 import Pyro4
 import time
 
+Pyro4.config.SERVERTYPE = "thread"
+Pyro4.config.THREADPOOL_SIZE = 100
+Pyro4.config.THREADPOOL_SIZE_MIN = 20
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from base.tickets import tickets
@@ -12,8 +16,7 @@ from base.redis_logica import RedisRepository
 @Pyro4.expose
 class TicketWorker(object):
     def __init__(self, worker_id):
-        """Inicializa el worker con un ID único, conecta con el repositorio 
-        Redis y la lógica de negocio de tickets."""
+        """Inicializa el worker con un ID único, conecta con Redis y la lógica de negocio."""
         self.worker_id = worker_id
         self.request_count = 0
 
@@ -22,47 +25,58 @@ class TicketWorker(object):
         print(f"Worker {self.worker_id} inicializado y conectado a Redis.")
 
     def comprar(self, client_id, request_id, seat_id=None):
-        """Ejecuta la lógica de compra invocando al servicio base, 
-        gestionando el contador de peticiones."""
-        self.request_count += 1
-        # Retardo artificial para hacer visible el escalado dinámico
-        time.sleep(0.01)
-        if seat_id is None:
-            resultado = self.servicio.comprar_no_numerada(client_id, request_id)
-        else:
-            resultado = self.servicio.comprar_numerada(client_id, int(seat_id), request_id)
-        if self.request_count % 500 == 0:
-            print(
-                f"[Worker {self.worker_id}] "
-                f"peticiones procesadas: {self.request_count} | "
-                f"última request: {request_id} | "
-                f"ok={resultado.ok}"
-            )
+        try:
+            self.request_count += 1
 
-        return resultado.ok
+            if seat_id is None:
+                resultado = self.servicio.comprar_no_numerada(client_id, request_id)
+            else:
+                seat_id = int(seat_id)
+                resultado = self.servicio.comprar_numerada(client_id, seat_id, request_id)
+
+            if self.request_count % 500 == 0:
+                print(
+                    f"[Worker {self.worker_id}] "
+                    f"procesadas={self.request_count} "
+                    f"última={request_id} "
+                    f"ok={resultado.ok}",
+                    flush=True
+                )
+
+            return resultado.ok
+
+        except Exception as e:
+            print(f"[Worker {self.worker_id}] ERROR: {e}", flush=True)
+            return False
+
 
 def main():
-    """Configura el Daemon, registra el worker en NS
-    con un nombre único y arranca el bucle de escucha de peticiones RPC."""
+    """Registra el worker en el Name Server y arranca el bucle de escucha."""
     if len(sys.argv) < 2:
         print("Uso: python server_pyro.py <ID_DEL_WORKER>")
         sys.exit(1)
 
     worker_id = sys.argv[1]
+
     try:
-        # nathost=127.0.0.1 asegura que las URIs sean accesibles localmente
-        daemon = Pyro4.Daemon(host="0.0.0.0", nathost="192.168.1.131") #ip host
+        daemon = Pyro4.Daemon(host="0.0.0.0", nathost="192.168.1.131")
         ns = Pyro4.locateNS(host="192.168.1.131")
+
         worker = TicketWorker(worker_id)
         uri = daemon.register(worker)
+
         nombre_servidor = f"tickets.worker.{worker_id}"
+
         try:
             ns.remove(nombre_servidor)
         except Exception:
             pass
+
         ns.register(nombre_servidor, uri)
+
         print(f"Worker Pyro listo: {nombre_servidor}")
         print(f"URI: {uri}")
+
         daemon.requestLoop()
 
     except Exception as e:
