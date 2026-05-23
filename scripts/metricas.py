@@ -136,7 +136,9 @@ def run_experiment_indirect(benchmark_path, num_workers):
     print(f"TOTAL PROCESADAS:             {total_ops}")
     print("*" * 40)
 
-    csv_file = "metricas_finales.csv"
+    # Guardar CSV siempre en la raíz del proyecto
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    csv_file = os.path.join(base_dir, "metricas_finales.csv")
     file_exists = os.path.isfile(csv_file)
 
     with open(csv_file, "a", encoding="utf-8") as f:
@@ -158,7 +160,7 @@ def run_experiment_indirect(benchmark_path, num_workers):
             f"{fail}\n"
         )
 
-    print("Métricas guardadas en metricas_finales.csv")
+    print(f"Métricas guardadas en {csv_file}")
 
 
 if __name__ == "__main__":
