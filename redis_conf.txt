@@ -1,0 +1,9 @@
+bind 0.0.0.0
+protected-mode no
+port 6379
+
+save ""
+appendonly yes
+appendfsync everysec
+stop-writes-on-bgsave-error no
+dir C:\RedisData
