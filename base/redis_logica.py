@@ -70,7 +70,7 @@ class RedisRepository:
     def comprar_no_numerada(self, cliente_id: str, request_id: str) -> modelo_compra:
         # Idempotencia para no revender en reintentos
         if self.redis.sismember("procesadas", request_id):
-            return modelo_compra(False, "FAIL", "request_duplicada", cliente_id, request_id)
+            return modelo_compra(True, "OK", "ya_comprado_anteriormente", cliente_id, request_id)
         
         # Lógica de reserva atómica con contador de 0 a 20k
         tickets_vendidos = self.redis.incr("contador_tickets")
