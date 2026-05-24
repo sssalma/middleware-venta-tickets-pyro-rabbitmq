@@ -113,12 +113,16 @@ def run_experiment_indirect(benchmark_path, num_workers):
             else:
                 fail += 1
 
-    no_num_success = r.scard("procesadas")
+    benchmark_name = os.path.basename(benchmark_path)
 
-    if no_num_success > 0:
-        success = no_num_success
-        intentos = int(r.get("contador_tickets") or 0)
-        fail = max(0, intentos - success)
+    # SOLO para benchmark unnumbered
+    if "unnumbered" in benchmark_name:
+        no_num_success = r.scard("procesadas")
+
+        if no_num_success > 0:
+            success = no_num_success
+            intentos = int(r.get("contador_tickets") or 0)
+            fail = max(0, intentos - success)
 
     total_ops = success + fail
 
