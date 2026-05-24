@@ -1,4 +1,1 @@
 modelo,benchmark,workers,tiempo_envio,tiempo_total,throughput_envio,throughput_total,success,fail
-indirecto,benchmark_unnumbered_20000.txt,4,1.05,9.39,19051.20,2130.32,20000,0
-directo,benchmark_unnumbered_20000.txt,4,,153.09,,130.64,20000,0
-indirecto,benchmark_unnumbered_20000.txt,4,1.08,6.37,18602.74,3140.63,20000,0
