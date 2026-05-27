@@ -15,6 +15,8 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 df = pd.read_csv(CSV)
 df["workers"] = df["workers"].astype(int)
 
+COL_THROUGHPUT = "throughput_total" if "throughput_total" in df.columns else "throughput"
+
 benchmarks = df["benchmark"].unique()
 modelos = df["modelo"].unique()
 colores = {"directo": "#2196F3", "indirecto": "#FF5722"}
@@ -28,7 +30,7 @@ for bm in benchmarks:
         data = subset[subset["modelo"] == mod].sort_values("workers")
         if data.empty:
             continue
-        plt.plot(data["workers"], data["throughput"], marcadores[mod],
+        plt.plot(data["workers"], data[COL_THROUGHPUT], marcadores[mod],
                  color=colores[mod], linewidth=2, markersize=8,
                  label=mod.capitalize())
 
@@ -56,7 +58,7 @@ for idx, bm in enumerate(benchmarks):
         data = subset[subset["modelo"] == mod].sort_values("workers")
         if data.empty:
             continue
-        ax.plot(data["workers"], data["throughput"], marcadores[mod],
+        ax.plot(data["workers"], data[COL_THROUGHPUT], marcadores[mod],
                 color=colores[mod], linewidth=2, markersize=8,
                 label=mod.capitalize())
 

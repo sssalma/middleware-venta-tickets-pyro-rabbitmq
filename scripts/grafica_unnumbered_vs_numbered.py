@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 df = pd.read_csv('metricas_finales.csv')
 df['workers'] = df['workers'].astype(int)
 
+COL_TP = 'throughput_total' if 'throughput_total' in df.columns else 'throughput'
+
 bm_unnumbered = 'benchmark_unnumbered_20000.txt'
 bm_numbered = 'benchmark_numbered_60000.txt'
 
@@ -24,7 +26,7 @@ for ax_idx, (title, modelo) in enumerate([
         data = df[(df['modelo'] == modelo) & (df['benchmark'] == bm_file)].sort_values('workers')
         if data.empty:
             continue
-        ax.plot(data['workers'], data['throughput'], marker,
+        ax.plot(data['workers'], data[COL_TP], marker,
                 color=color, linewidth=2.5, markersize=9, label=label)
 
     ax.set_title(title, fontsize=13, fontweight='bold')

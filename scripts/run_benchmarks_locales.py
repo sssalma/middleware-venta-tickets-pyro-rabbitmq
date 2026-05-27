@@ -34,7 +34,7 @@ BENCHMARKS = [
     ("bm_hotspot.txt", os.path.join(ROOT_DIR, "benchmarks", "bm_hotspot.txt")),
     ("bm_uniforme.txt", os.path.join(ROOT_DIR, "benchmarks", "bm_uniforme.txt")),
 ]
-WORKER_COUNTS = [2, 4, 8, 16]
+WORKER_COUNTS = [1, 2, 3, 4]
 CSV_FILE = os.path.join(ROOT_DIR, "metricas_finales.csv")
 
 def reset_all():
@@ -63,7 +63,6 @@ class BenchmarkWorker:
 
     def comprar(self, client_id, request_id, seat_id=None):
         self.count += 1
-        time.sleep(0.01)
         if seat_id is None:
             res = self.svc.comprar_no_numerada(client_id, request_id)
         else:
@@ -74,32 +73,34 @@ def run_direct_benchmark(benchmark_name, benchmark_path, num_workers):
     print(f"\n--- DIRECTO: {benchmark_name}, workers={num_workers} ---")
     reset_all()
 
-    # 1. Iniciar NS
-    ns_stop = threading.Event()
-    def start_ns():
-        try:
-            Pyro4.naming.startNSloop(host="localhost", port=9090)
-        except:
-            pass
-    t = threading.Thread(target=start_ns, daemon=True)
-    t.start()
-    time.sleep(1)
-
-    # Verificar NS
+    # 1. Iniciar/reusar NS
     try:
-        Pyro4.locateNS(host="localhost")
-    except Exception as e:
-        print(f"  Error NS: {e}")
-        return
+        ns = Pyro4.locateNS(host="localhost")
+        # Limpiar registros viejos
+        for name in list(ns.list(prefix="tickets.worker.").keys()):
+            try:
+                ns.remove(name)
+            except:
+                pass
+    except Exception:
+        def start_ns():
+            try:
+                Pyro4.naming.startNSloop(host="localhost", port=9090)
+            except:
+                pass
+        t = threading.Thread(target=start_ns, daemon=True)
+        t.start()
+        time.sleep(1)
+        ns = Pyro4.locateNS(host="localhost")
 
     # 2. Iniciar workers
     worker_daemons = []
     def start_worker(wid):
         daemon = Pyro4.Daemon(host="localhost")
-        ns = Pyro4.locateNS(host="localhost")
+        ns_local = Pyro4.locateNS(host="localhost")
         worker = BenchmarkWorker(wid)
         uri = daemon.register(worker)
-        ns.register(f"tickets.worker.{wid}", uri)
+        ns_local.register(f"tickets.worker.{wid}", uri)
         worker_daemons.append(daemon)
         daemon.requestLoop()
 
@@ -156,14 +157,16 @@ def run_direct_benchmark(benchmark_name, benchmark_path, num_workers):
 
     print(f"  Tiempo: {duracion:.2f}s, Throughput: {throughput:.2f} ops/s, OK: {exitos}, FAIL: {fallos}")
 
-    # Guardar en CSV
+    # Guardar en CSV (formato 9 columnas)
     file_exists = os.path.isfile(CSV_FILE)
     with open(CSV_FILE, "a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         if not file_exists:
-            writer.writerow(["modelo","benchmark","workers","tiempo","throughput","success","fail"])
+            writer.writerow(["modelo","benchmark","workers","tiempo_envio","tiempo_total","throughput_envio","throughput_total","success","fail"])
         writer.writerow(["directo", benchmark_name, num_workers,
-                         f"{duracion:.2f}", f"{throughput:.2f}", exitos, fallos])
+                         "", f"{duracion:.2f}",
+                         "", f"{throughput:.2f}",
+                         exitos, fallos])
 
     reset_all()
 
@@ -184,10 +187,10 @@ def run_indirect_benchmark(benchmark_name, benchmark_path, num_workers):
     #    pero con los workers reales.
 
     creds = pika.PlainCredentials("admin", "admin")
-    conn_params = pika.ConnectionParameters(host="localhost", credentials=creds)
+    conn_params = pika.ConnectionParameters(host="localhost", credentials=creds,
+                                             heartbeat=600, blocked_connection_timeout=7200)
 
     # Lanzar workers como hilos
-    worker_stop = threading.Event()
     results_queue = []
 
     def rabbit_worker(wid):
@@ -266,14 +269,16 @@ def run_indirect_benchmark(benchmark_name, benchmark_path, num_workers):
 
     print(f"  Tiempo: {duracion:.2f}s, Throughput: {throughput:.2f} ops/s, OK: {exitos}, FAIL: {fallos}")
 
-    # Guardar en CSV
+    # Guardar en CSV (formato 9 columnas)
     file_exists = os.path.isfile(CSV_FILE)
     with open(CSV_FILE, "a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         if not file_exists:
-            writer.writerow(["modelo","benchmark","workers","tiempo","throughput","success","fail"])
+            writer.writerow(["modelo","benchmark","workers","tiempo_envio","tiempo_total","throughput_envio","throughput_total","success","fail"])
         writer.writerow(["indirecto", benchmark_name, num_workers,
-                         f"{duracion:.2f}", f"{throughput:.2f}", exitos, fallos])
+                         f"{duracion:.2f}", f"{duracion:.2f}",
+                         f"{throughput:.2f}", f"{throughput:.2f}",
+                         exitos, fallos])
 
     reset_all()
 
