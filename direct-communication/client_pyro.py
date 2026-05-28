@@ -13,11 +13,13 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 
 def procesar_bloque(args):
+    # cada hilo procesa un bloque de lineas y usa su propio proxy
     bloque_lineas, frontend_uri = args
 
     exitos = 0
     fallos = 0
 
+    # proxy al frontend, no a los workers directamnte
     frontend = Pyro4.Proxy(frontend_uri)
 
     try:
@@ -25,14 +27,17 @@ def procesar_bloque(args):
             parts = line.strip().split()
 
             try:
+                # formato no numerado: BUY cliente request_id
                 if len(parts) == 3:
                     res = frontend.comprar(parts[1], parts[2])
 
+                # formato numerado: BUY cliente seat_id request_id
                 elif len(parts) == 4:
                     seat_id = int(parts[2])
                     res = frontend.comprar(parts[1], parts[3], seat_id)
 
                 else:
+                    # si la linea no tiene formato correcto la damos como fallo
                     res = False
 
                 if res:
@@ -41,16 +46,19 @@ def procesar_bloque(args):
                     fallos += 1
 
             except Exception as e:
+                # si falla una peticion concreta no paramos todo el benchmark
                 print("ERROR:", e)
                 fallos += 1
 
     finally:
+        # se libera el proxy al acabar el bloque
         frontend._pyroRelease()
 
     return exitos, fallos
 
 
 def dividir_en_bloques(lines, num_bloques):
+    # reparte las lineas entre los hilos de forma equilibrada
     bloques = [[] for _ in range(num_bloques)]
 
     for i, line in enumerate(lines):
@@ -67,6 +75,7 @@ def guardar_metricas_csv(
     exitos,
     fallos
 ):
+    # guardamos las metricas en la raiz del proyecto
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     csv_file = os.path.join(base_dir, "metricas_finales.csv")
 
@@ -107,12 +116,13 @@ def run_benchmark(file_path):
         return
 
     try:
+        # localizamos el name server de pyro
         ns = Pyro4.locateNS(host=SERVER_IP, port=SERVER_PORT)
 
-        # SINGLE ENTRY POINT
+        # single entry point: el cliente solo busca el frontend
         frontend_uri = ns.lookup("tickets.frontend")
 
-        # Solo para métricas
+        # esto solo se usa para saber cuantos workers habia activos
         servicios = ns.list(prefix="tickets.worker.")
         num_workers = len(servicios)
 
@@ -127,6 +137,7 @@ def run_benchmark(file_path):
         print(f"Error Pyro: {e}")
         return
 
+    # cargamos solo las operaciones BUY del benchmark
     with open(file_path, "r", encoding="utf-8") as f:
         lines = [line for line in f.readlines() if line.startswith("BUY")]
 
@@ -137,6 +148,7 @@ def run_benchmark(file_path):
         f"y {hilos_efectivos} hilos..."
     )
 
+    # dividimos el benchmark entre los hilos
     bloques = dividir_en_bloques(lines, hilos_efectivos)
     tareas = [(bloque, frontend_uri) for bloque in bloques]
 
@@ -145,9 +157,11 @@ def run_benchmark(file_path):
     exitos = 0
     fallos = 0
 
+    # ejecutamos las peticiones de forma concurrente
     with ThreadPoolExecutor(max_workers=hilos_efectivos) as executor:
         resultados = list(executor.map(procesar_bloque, tareas))
 
+    # juntamos los resultados de todos los hilos
     for ex, fa in resultados:
         exitos += ex
         fallos += fa

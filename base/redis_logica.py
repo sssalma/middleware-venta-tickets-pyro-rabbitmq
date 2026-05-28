@@ -15,7 +15,7 @@ class RedisRepository:
     def comprar_numerada(self, cliente_id, seat_id, request_id):
         clave_request = f"request:{request_id}"
 
-        # 1. Si ya se procesó esta request, devolver lo mismo
+        # Si ya se procesó esta request, devolver lo mismo
         if self.redis.exists(clave_request):
             datos = json.loads(self.redis.get(clave_request))       # type: ignore
             return modelo_compra(
@@ -27,7 +27,7 @@ class RedisRepository:
                 seat_id=datos["seat_id"]
             )
 
-        # 2. Validar asiento
+        #Validar asiento
         if seat_id < 1 or seat_id > 20000:
             resultado = modelo_compra(
                 ok=False,
@@ -40,7 +40,7 @@ class RedisRepository:
             self.redis.set(clave_request, json.dumps(resultado.to_dict()))
             return resultado
 
-        # 3. Intentar reservar el asiento
+        # Intentar reservar el asiento
         clave_asiento = f"seat:{seat_id}"
         reservado = self.redis.set(clave_asiento, cliente_id, nx=True)
 
@@ -63,7 +63,7 @@ class RedisRepository:
                 seat_id=seat_id
             )
 
-        # 4. Guardar resultado para idempotencia
+        # Guardar resultado para idempotencia
         self.redis.set(clave_request, json.dumps(resultado.to_dict()))
         return resultado
     
