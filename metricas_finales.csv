@@ -22,3 +22,4 @@ directo,bm_uniforme.txt,2,,46.28,,1296.39,19022,40978
 directo,benchmark_unnumbered_20000.txt,3,,17.11,,1169.16,20000,0
 directo,benchmark_numbered_60000.txt,3,,21.15,,1228.96,20000,5997
 directo,bm_hotspot.txt,3,,48.46,,1238.15,10008,49992
+directo,bm_uniforme.txt,3,,48,93,,1226.16,19022,40978
