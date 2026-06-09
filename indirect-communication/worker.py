@@ -12,24 +12,31 @@ repo = RedisRepository()
 service = tickets(repo)
 
 def procesar_compra(ch, method, properties, body):
-    # convierto el mensjase json a dict y miro si hay un argumento seatid (dif numerado o no)
     data = json.loads(body)
+    request_id = data["request_id"]
+    now = time.time()
+
+    repo.redis.setnx("worker:processing_started_at", now)
+
+    repo.redis.set(f"worker:start:{request_id}", now)
+
     if "seat_id" in data:
         resultado = service.comprar_numerada(
-            data["cliente_id"], 
-            data["seat_id"], 
-            data["request_id"]
+            data["cliente_id"],
+            data["seat_id"],
+            request_id
         )
     else:
         resultado = service.comprar_no_numerada(
-            data["cliente_id"], 
-            data["request_id"]
+            data["cliente_id"],
+            request_id
         )
 
-    print(f"Request {data['request_id']}: {resultado.status} - {resultado.motivo}")
-    # Confirmación manual a RabbitMQ para detectar si falla una venta y reintentarla
+    now_end = time.time()
+    repo.redis.set(f"worker:end:{request_id}", now_end)
+    repo.redis.set("worker:processing_finished_at", now_end)
 
-    #time.sleep(0.01)
+    print(f"Request {request_id}: {resultado.status} - {resultado.motivo}")
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
 def iniciar_worker():

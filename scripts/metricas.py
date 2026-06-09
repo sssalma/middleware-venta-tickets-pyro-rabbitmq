@@ -93,10 +93,18 @@ def run_experiment_indirect(benchmark_path, num_workers):
 
         time.sleep(0.2)
 
-    end_time = time.time()
+    # Leer tiempos registrados por el worker (server-side)
+    processing_started = r.get("worker:processing_started_at")
+    processing_finished = r.get("worker:processing_finished_at")
 
-    tiempo_total = end_time - start_time
-    tiempo_procesamiento = end_time - send_end_time
+    if processing_started and processing_finished:
+        tiempo_procesamiento_server = float(processing_finished) - float(processing_started)
+        tiempo_total = tiempo_procesamiento_server
+        tiempo_procesamiento = tiempo_procesamiento_server
+    else:
+        # Fallback a cálculo local si no hay datos del worker
+        tiempo_total = time.time() - start_time
+        tiempo_procesamiento = time.time() - send_end_time
 
     print("\n[3/3] Recopilando métricas de Redis...")
 
@@ -130,11 +138,11 @@ def run_experiment_indirect(benchmark_path, num_workers):
     throughput_envio = total_benchmark_ops / tiempo_envio if tiempo_envio > 0 else 0
 
     print("\n" + "*" * 40)
-    print(f"TIEMPO ENVÍO FIRE-AND-FORGET: {tiempo_envio:.2f} seg")
-    print(f"TIEMPO PROCESAMIENTO:         {tiempo_procesamiento:.2f} seg")
-    print(f"TIEMPO TOTAL END-TO-END:      {tiempo_total:.2f} seg")
-    print(f"THROUGHPUT ENVÍO:             {throughput_envio:.2f} ops/seg")
-    print(f"THROUGHPUT TOTAL:             {throughput_total:.2f} ops/seg")
+    print(f"TIEMPO ENVÍO FIRE-AND-FORGET:   {tiempo_envio:.2f} seg (cliente)")
+    print(f"TIEMPO PROCESAMIENTO (server):  {tiempo_procesamiento:.2f} seg")
+    print(f"TIEMPO TOTAL (server-side):     {tiempo_total:.2f} seg")
+    print(f"THROUGHPUT ENVÍO:               {throughput_envio:.2f} ops/seg")
+    print(f"THROUGHPUT TOTAL:               {throughput_total:.2f} ops/seg")
     print(f"SUCCESS:                      {success}")
     print(f"FAIL:                         {fail}")
     print(f"TOTAL PROCESADAS:             {total_ops}")
