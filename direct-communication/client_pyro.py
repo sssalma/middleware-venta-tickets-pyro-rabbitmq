@@ -13,32 +13,29 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 
 def procesar_bloque(args):
-    # cada hilo procesa un bloque de lineas y usa su propio proxy
     bloque_lineas, frontend_uri = args
-
     exitos = 0
     fallos = 0
 
-    # proxy al frontend, no a los workers directamnte
     frontend = Pyro4.Proxy(frontend_uri)
 
     try:
         for line in bloque_lineas:
             parts = line.strip().split()
+            if len(parts) not in (3, 4):
+                fallos += 1
+                continue
 
             try:
-                # formato no numerado: BUY cliente request_id
+                worker_uri = frontend.asignar_worker()
+                worker = Pyro4.Proxy(worker_uri)
+
                 if len(parts) == 3:
-                    res = frontend.comprar(parts[1], parts[2])
-
-                # formato numerado: BUY cliente seat_id request_id
-                elif len(parts) == 4:
-                    seat_id = int(parts[2])
-                    res = frontend.comprar(parts[1], parts[3], seat_id)
-
+                    res = worker.comprar(parts[1], parts[2])
                 else:
-                    # si la linea no tiene formato correcto la damos como fallo
-                    res = False
+                    res = worker.comprar(parts[1], parts[3], int(parts[2]))
+
+                worker._pyroRelease()
 
                 if res:
                     exitos += 1
@@ -46,12 +43,10 @@ def procesar_bloque(args):
                     fallos += 1
 
             except Exception as e:
-                # si falla una peticion concreta no paramos todo el benchmark
                 print("ERROR:", e)
                 fallos += 1
 
     finally:
-        # se libera el proxy al acabar el bloque
         frontend._pyroRelease()
 
     return exitos, fallos
