@@ -1,16 +1,19 @@
+import sys
+import os
 import pika
 import json
-import sys
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from config import RABBIT_HOST, RABBIT_USER, RABBIT_PASSWORD, QUEUE_NAME
 
 def enviar_benchmark(nombre_fichero):
     """
     Lee el archivo de benchmark línea a línea y publica cada petición de compra 
     en la cola de RabbitMQ en mensajes JSON persistentes.
     """
-    # IP del portátil 
-    host_servidor = '192.168.1.131' 
-    # Credenciales del nuevo usuario
-    credentials = pika.PlainCredentials('admin', 'admin')
+    host_servidor = RABBIT_HOST
+    credentials = pika.PlainCredentials(RABBIT_USER, RABBIT_PASSWORD)
 
     try:
         connection = pika.BlockingConnection(pika.ConnectionParameters(
@@ -23,7 +26,7 @@ def enviar_benchmark(nombre_fichero):
         print(f"Error conectando a RabbitMQ: {e}")
         return
     #durable=True para que sobreviva a reinicios de RabbitMQ
-    channel.queue_declare(queue='cola_tickets', durable=True)
+    channel.queue_declare(queue=QUEUE_NAME, durable=True)
     try:
         with open(nombre_fichero, 'r') as f:
             for linea in f:
@@ -51,7 +54,7 @@ def enviar_benchmark(nombre_fichero):
                 # Publicar mensaje: enrutador por defecto (''), cola 'cola_tickets', mensaje en formato JSON, y marcarlo como persistente
                 channel.basic_publish(
                     exchange='',
-                    routing_key='cola_tickets',
+                    routing_key=QUEUE_NAME,
                     body=json.dumps(payload),
                     properties=pika.BasicProperties(
                         delivery_mode=2, 

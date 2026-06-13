@@ -5,11 +5,9 @@ import csv
 import Pyro4
 from concurrent.futures import ThreadPoolExecutor
 
-SERVER_IP = "192.168.1.131"
-SERVER_PORT = 9090
-NUM_HILOS = 10
-
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from config import PYRO_NS_HOST, PYRO_NS_PORT, CLIENT_NUM_HILOS
 
 
 def procesar_bloque(args):
@@ -112,7 +110,7 @@ def run_benchmark(file_path):
 
     try:
         # localizamos el name server de pyro
-        ns = Pyro4.locateNS(host=SERVER_IP, port=SERVER_PORT)
+        ns = Pyro4.locateNS(host=PYRO_NS_HOST, port=PYRO_NS_PORT)
 
         # single entry point: el cliente solo busca el frontend
         frontend_uri = ns.lookup("tickets.frontend")
@@ -136,7 +134,7 @@ def run_benchmark(file_path):
     with open(file_path, "r", encoding="utf-8") as f:
         lines = [line for line in f.readlines() if line.startswith("BUY")]
 
-    hilos_efectivos = min(NUM_HILOS, len(lines))
+    hilos_efectivos = min(CLIENT_NUM_HILOS, len(lines))
 
     print(
         f"Iniciando benchmark DIRECTO con {len(lines)} operaciones "

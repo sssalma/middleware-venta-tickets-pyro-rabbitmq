@@ -3,3 +3,4 @@ __pycache__/
 *.pyo
 *.pyd
 dump.rdb
+plan-despliegue-aws.md

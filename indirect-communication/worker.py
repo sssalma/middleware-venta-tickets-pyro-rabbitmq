@@ -4,10 +4,10 @@ import time
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import RABBIT_HOST, RABBIT_USER, RABBIT_PASSWORD, QUEUE_NAME
 from base.redis_logica import RedisRepository
 from base.tickets import tickets
 
-# lógica de negocio
 repo = RedisRepository()
 service = tickets(repo)
 
@@ -42,10 +42,11 @@ def procesar_compra(ch, method, properties, body):
 def iniciar_worker():
     try:
         #connection to rabbitmq
-        connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
+        credentials = pika.PlainCredentials(RABBIT_USER, RABBIT_PASSWORD)
+        connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBIT_HOST, credentials=credentials))
         channel = connection.channel()
 
-        channel.queue_declare(queue='cola_tickets', durable=True) #durable= True para persistir si RabbitMQ se reinicia
+        channel.queue_declare(queue=QUEUE_NAME, durable=True)
         
         channel.basic_qos(prefetch_count=1)# Fair dispatch: espero a recibir el ack manual antes de enviar otro mensaje al mismo worker
         channel.basic_consume(queue='cola_tickets', on_message_callback=procesar_compra) #cuando llegue un mensaje llamar a procesar_compra

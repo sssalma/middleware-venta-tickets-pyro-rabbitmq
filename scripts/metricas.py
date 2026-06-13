@@ -1,20 +1,19 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import time
 import subprocess
 import redis
 import pika
-import sys
 import json
-import os
 
-RABBIT_HOST = "192.168.1.131"
-QUEUE_NAME = "cola_tickets"
-REDIS_HOST = "192.168.1.131"
-REDIS_PORT = 6379
+from config import RABBIT_HOST, RABBIT_USER, RABBIT_PASSWORD, QUEUE_NAME, REDIS_HOST, REDIS_PORT
 
 
 def get_rabbit_message_count():
     try:
-        credentials = pika.PlainCredentials("admin", "admin")
+        credentials = pika.PlainCredentials(RABBIT_USER, RABBIT_PASSWORD)
         connection = pika.BlockingConnection(
             pika.ConnectionParameters(
                 host=RABBIT_HOST,

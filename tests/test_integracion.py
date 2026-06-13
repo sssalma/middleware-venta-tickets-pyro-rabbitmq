@@ -1,6 +1,5 @@
 """
-Test de integracion: verifica comunicacion directa (Pyro4) e indirecta (RabbitMQ)
-sin depender de IPs hardcodeadas (usa localhost).
+Test de integracion: verifica comunicacion directa (Pyro4) e indirecta (RabbitMQ).
 """
 import sys
 import os
@@ -10,17 +9,10 @@ import json
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# --- PARCHE: redirigir todo a localhost ---
+from config import PYRO_NS_HOST, PYRO_NS_PORT, REDIS_HOST, REDIS_PORT, RABBIT_HOST, RABBIT_USER, RABBIT_PASSWORD, QUEUE_NAME
+
 import Pyro4.naming
 import Pyro4.core
-original_locateNS = Pyro4.locateNS
-
-def patched_locateNS(host=None, **kwargs):
-    if host and "192.168.1.131" in host:
-        host = "localhost"
-    return original_locateNS(host=host, **kwargs)
-
-Pyro4.locateNS = patched_locateNS
 
 from base.tickets import tickets
 from base.redis_logica import RedisRepository
@@ -128,7 +120,7 @@ print("=" * 60)
 # Iniciar Name Server de Pyro4 en un hilo aparte
 def run_ns():
     try:
-        Pyro4.naming.startNSloop(host="localhost", port=9090)
+        Pyro4.naming.startNSloop(host=PYRO_NS_HOST, port=PYRO_NS_PORT)
     except Exception:
         pass
 
@@ -138,8 +130,8 @@ time.sleep(1)
 
 # Verificar que el NS esta vivo
 try:
-    ns = Pyro4.locateNS(host="localhost")
-    print("  [OK] Name Server iniciado en localhost:9090")
+    ns = Pyro4.locateNS(host=PYRO_NS_HOST, port=PYRO_NS_PORT)
+    print(f"  [OK] Name Server iniciado en {PYRO_NS_HOST}:{PYRO_NS_PORT}")
 except Exception as e:
     print("  [FAIL] No se pudo iniciar NS:", e)
     sys.exit(1)
@@ -165,8 +157,8 @@ class TestWorker:
 workers_daemons = []
 
 def start_worker(wid):
-    daemon = Pyro4.Daemon(host="localhost")
-    ns = Pyro4.locateNS(host="localhost")
+    daemon = Pyro4.Daemon(host=PYRO_NS_HOST)
+    ns = Pyro4.locateNS(host=PYRO_NS_HOST, port=PYRO_NS_PORT)
     worker = TestWorker(wid)
     uri = daemon.register(worker)
     ns.register("tickets.worker." + str(wid), uri)
@@ -180,7 +172,7 @@ for i in range(2):
 time.sleep(1)
 
 # Verificar workers registrados
-ns = Pyro4.locateNS(host="localhost")
+ns = Pyro4.locateNS(host=PYRO_NS_HOST, port=PYRO_NS_PORT)
 servicios = ns.list(prefix="tickets.worker.")
 assert len(servicios) == 2, "Esperaba 2 workers, encontre " + str(len(servicios))
 print("  [OK] 2 Workers Pyro4 registrados en NS")
@@ -225,21 +217,21 @@ import pika
 # Test: Publicar mensajes en la cola de RabbitMQ
 #   Verifica que el producer puede conectar y publicar mensajes persistentes
 try:
-    creds = pika.PlainCredentials("admin", "admin")
-    conn = pika.BlockingConnection(pika.ConnectionParameters(host="localhost", credentials=creds))
+    creds = pika.PlainCredentials(RABBIT_USER, RABBIT_PASSWORD)
+    conn = pika.BlockingConnection(pika.ConnectionParameters(host=RABBIT_HOST, credentials=creds))
     chan = conn.channel()
-    chan.queue_declare(queue="cola_tickets", durable=True)
+    chan.queue_declare(queue=QUEUE_NAME, durable=True)
 
     # Probar envio y consumo de un mensaje
     payload_num = json.dumps({"cliente_id": "c1", "seat_id": 500, "request_id": "req500"})
-    chan.basic_publish(exchange="", routing_key="cola_tickets", body=payload_num,
+    chan.basic_publish(exchange="", routing_key=QUEUE_NAME, body=payload_num,
                        properties=pika.BasicProperties(delivery_mode=2))
 
     payload_nnum = json.dumps({"cliente_id": "c2", "request_id": "req501"})
-    chan.basic_publish(exchange="", routing_key="cola_tickets", body=payload_nnum,
+    chan.basic_publish(exchange="", routing_key=QUEUE_NAME, body=payload_nnum,
                        properties=pika.BasicProperties(delivery_mode=2))
 
-    print("  [OK] Mensajes publicados en cola_tickets")
+    print(f"  [OK] Mensajes publicados en {QUEUE_NAME}")
     conn.close()
 except Exception as e:
     print("  [FAIL] Error con RabbitMQ:", e)
@@ -260,12 +252,12 @@ def procesar_test(ch, method, properties, body):
     resultados_recibidos.append((data["request_id"], res.ok, res.motivo))
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
-creds = pika.PlainCredentials("admin", "admin")
-conn2 = pika.BlockingConnection(pika.ConnectionParameters(host="localhost", credentials=creds))
+creds = pika.PlainCredentials(RABBIT_USER, RABBIT_PASSWORD)
+conn2 = pika.BlockingConnection(pika.ConnectionParameters(host=RABBIT_HOST, credentials=creds))
 chan2 = conn2.channel()
-chan2.queue_declare(queue="cola_tickets", durable=True)
+chan2.queue_declare(queue=QUEUE_NAME, durable=True)
 chan2.basic_qos(prefetch_count=1)
-chan2.basic_consume(queue="cola_tickets", on_message_callback=procesar_test)
+chan2.basic_consume(queue=QUEUE_NAME, on_message_callback=procesar_test)
 
 # Consumir los 2 mensajes con timeout
 timeout = 5
@@ -291,10 +283,10 @@ conn2.close()
 # Test: Idempotencia en RabbitMQ - reintento de mensaje
 #   Simula un reintento de red: mismo mensaje publicado de nuevo
 #   El worker debe devolver el mismo resultado (cacheado en Redis) sin duplicar la venta
-creds3 = pika.PlainCredentials("admin", "admin")
-conn3 = pika.BlockingConnection(pika.ConnectionParameters(host="localhost", credentials=creds3))
+creds3 = pika.PlainCredentials(RABBIT_USER, RABBIT_PASSWORD)
+conn3 = pika.BlockingConnection(pika.ConnectionParameters(host=RABBIT_HOST, credentials=creds3))
 chan3 = conn3.channel()
-chan3.basic_publish(exchange="", routing_key="cola_tickets", body=payload_num,
+chan3.basic_publish(exchange="", routing_key=QUEUE_NAME, body=payload_num,
                    properties=pika.BasicProperties(delivery_mode=2))
 chan3.close()
 
@@ -309,10 +301,10 @@ def procesar_reintento(ch, method, properties, body):
     resultados_recibidos2.append((data["request_id"], res.ok, res.motivo))
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
-conn4 = pika.BlockingConnection(pika.ConnectionParameters(host="localhost", credentials=creds))
+conn4 = pika.BlockingConnection(pika.ConnectionParameters(host=RABBIT_HOST, credentials=creds))
 chan4 = conn4.channel()
-chan4.queue_declare(queue="cola_tickets", durable=True)
-chan4.basic_consume(queue="cola_tickets", on_message_callback=procesar_reintento, auto_ack=False)
+chan4.queue_declare(queue=QUEUE_NAME, durable=True)
+chan4.basic_consume(queue=QUEUE_NAME, on_message_callback=procesar_reintento, auto_ack=False)
 start = time.time()
 while len(resultados_recibidos2) < 1 and (time.time() - start) < 5:
     conn4.process_data_events(time_limit=1)
@@ -330,10 +322,10 @@ print("  [PASS] Test comunicacion indirecta: TODOS OK")
 reset_redis()
 
 # Limpiar cola RabbitMQ
-creds_clean = pika.PlainCredentials("admin", "admin")
-conn_clean = pika.BlockingConnection(pika.ConnectionParameters(host="localhost", credentials=creds_clean))
+creds_clean = pika.PlainCredentials(RABBIT_USER, RABBIT_PASSWORD)
+conn_clean = pika.BlockingConnection(pika.ConnectionParameters(host=RABBIT_HOST, credentials=creds_clean))
 chan_clean = conn_clean.channel()
-chan_clean.queue_delete(queue="cola_tickets")
+chan_clean.queue_delete(queue=QUEUE_NAME)
 conn_clean.close()
 
 print()

@@ -1,6 +1,12 @@
+import sys
+import os
 import time
 import threading
 import Pyro4
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from config import PYRO_NS_HOST, PYRO_NS_PORT, PYRO_NAT_HOST
 
 Pyro4.config.SERVERTYPE = "thread"
 Pyro4.config.THREADPOOL_SIZE = 100
@@ -24,7 +30,7 @@ class TicketFrontend(object):
             return
 
         try:
-            ns = Pyro4.locateNS(host="192.168.1.131", port=9090)
+            ns = Pyro4.locateNS(host=PYRO_NS_HOST, port=PYRO_NS_PORT)
             servicios = ns.list(prefix="tickets.worker.")
             nuevas_uris = list(servicios.values())
         except Exception:
@@ -54,12 +60,12 @@ class TicketFrontend(object):
 def main():
     # arranca el frontend y lo registra como tickets.frontend
     try:
-        daemon = Pyro4.Daemon(
-            host="0.0.0.0",
-            nathost="192.168.1.131"
-        )
+        daemon_kwargs = {"host": "0.0.0.0"}
+        if PYRO_NAT_HOST:
+            daemon_kwargs["nathost"] = PYRO_NAT_HOST
+        daemon = Pyro4.Daemon(**daemon_kwargs)
 
-        ns = Pyro4.locateNS(host="192.168.1.131", port=9090)
+        ns = Pyro4.locateNS(host=PYRO_NS_HOST, port=PYRO_NS_PORT)
 
         frontend = TicketFrontend()
         uri = daemon.register(frontend)

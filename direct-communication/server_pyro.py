@@ -3,14 +3,15 @@ import os
 import Pyro4
 import time
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from config import PYRO_NS_HOST, PYRO_NS_PORT, PYRO_NAT_HOST
+from base.tickets import tickets
+from base.redis_logica import RedisRepository
+
 Pyro4.config.SERVERTYPE = "thread"
 Pyro4.config.THREADPOOL_SIZE = 100
 Pyro4.config.THREADPOOL_SIZE_MIN = 20
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from base.tickets import tickets
-from base.redis_logica import RedisRepository
 
 
 @Pyro4.expose
@@ -68,10 +69,12 @@ def main():
 
     try:
         # el daemon escucha peticiones pyro desde fuera de la maquina
-        daemon = Pyro4.Daemon(host="0.0.0.0", nathost="192.168.1.131")
+        daemon_kwargs = {"host": "0.0.0.0"}
+        if PYRO_NAT_HOST:
+            daemon_kwargs["nathost"] = PYRO_NAT_HOST
+        daemon = Pyro4.Daemon(**daemon_kwargs)
 
-        # localizamos el name server del portatil/host
-        ns = Pyro4.locateNS(host="192.168.1.131")
+        ns = Pyro4.locateNS(host=PYRO_NS_HOST, port=PYRO_NS_PORT)
 
         worker = TicketWorker(worker_id)
         uri = daemon.register(worker)
