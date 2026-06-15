@@ -4,3 +4,6 @@ __pycache__/
 *.pyd
 dump.rdb
 plan-despliegue-aws.md
+configuracion-aws.md
+*.xlsx
+scripts/run_all_benchmarks.sh

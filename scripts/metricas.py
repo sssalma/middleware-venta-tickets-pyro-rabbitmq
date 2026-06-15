@@ -98,7 +98,7 @@ def run_experiment_indirect(benchmark_path, num_workers):
 
     if processing_started and processing_finished:
         tiempo_procesamiento_server = float(processing_finished) - float(processing_started)
-        tiempo_total = tiempo_procesamiento_server
+        tiempo_total = tiempo_envio + tiempo_procesamiento_server
         tiempo_procesamiento = tiempo_procesamiento_server
     else:
         # Fallback a cálculo local si no hay datos del worker
