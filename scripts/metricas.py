@@ -63,7 +63,7 @@ def run_experiment_indirect(benchmark_path, num_workers):
     env_vars["PYTHONPATH"] = os.getcwd()
 
     subprocess.run(
-        ["python", "indirect-communication/producer.py", benchmark_path],
+        ["python3", "indirect-communication/producer.py", benchmark_path],
         env=env_vars
     )
 
@@ -96,7 +96,7 @@ def run_experiment_indirect(benchmark_path, num_workers):
     processing_started = r.get("worker:processing_started_at")
     processing_finished = r.get("worker:processing_finished_at")
 
-    if processing_started and processing_finished:
+    if isinstance(processing_started, str) and isinstance(processing_finished, str):
         tiempo_procesamiento_server = float(processing_finished) - float(processing_started)
         tiempo_total = tiempo_envio + tiempo_procesamiento_server
         tiempo_procesamiento = tiempo_procesamiento_server
@@ -107,13 +107,14 @@ def run_experiment_indirect(benchmark_path, num_workers):
 
     print("\n[3/3] Recopilando métricas de Redis...")
 
-    all_requests_keys = r.keys("request:*")
+    all_requests_keys_raw = r.keys("request:*")
+    all_requests_keys = all_requests_keys_raw if isinstance(all_requests_keys_raw, list) else []
     success = 0
     fail = 0
 
     for key in all_requests_keys:
         val = r.get(key)
-        if val:
+        if isinstance(val, str):
             datos = json.loads(val)
             if datos.get("status") in ["SUCCESS", "OK"]:
                 success += 1
@@ -124,11 +125,13 @@ def run_experiment_indirect(benchmark_path, num_workers):
 
     # SOLO para benchmark unnumbered
     if "unnumbered" in benchmark_name:
-        no_num_success = r.scard("procesadas")
+        no_num_success_raw = r.scard("procesadas")
+        no_num_success = no_num_success_raw if isinstance(no_num_success_raw, int) else 0
 
         if no_num_success > 0:
             success = no_num_success
-            intentos = int(r.get("contador_tickets") or 0)
+            intentos_raw = r.get("contador_tickets")
+            intentos = int(intentos_raw) if isinstance(intentos_raw, str) else 0
             fail = max(0, intentos - success)
 
     total_ops = success + fail

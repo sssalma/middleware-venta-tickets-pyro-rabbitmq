@@ -2,6 +2,7 @@ import sys
 import os
 import time
 import threading
+from typing import Any
 import Pyro4
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -9,8 +10,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import PYRO_NS_HOST, PYRO_NS_PORT, PYRO_NAT_HOST
 
 Pyro4.config.SERVERTYPE = "thread"
-Pyro4.config.THREADPOOL_SIZE = 100
-Pyro4.config.THREADPOOL_SIZE_MIN = 20
+Pyro4.config.THREADPOOL_SIZE = 100  # type: ignore[assignment]
+Pyro4.config.THREADPOOL_SIZE_MIN = 20  # type: ignore[assignment]
 
 
 @Pyro4.expose
@@ -58,34 +59,38 @@ class TicketFrontend(object):
 
 
 def main():
-    # arranca el frontend y lo registra como tickets.frontend
-    try:
-        daemon_kwargs = {"host": "0.0.0.0"}
-        if PYRO_NAT_HOST:
-            daemon_kwargs["nathost"] = PYRO_NAT_HOST
-        daemon = Pyro4.Daemon(**daemon_kwargs)
-
-        ns = Pyro4.locateNS(host=PYRO_NS_HOST, port=PYRO_NS_PORT)
-
-        frontend = TicketFrontend()
-        uri = daemon.register(frontend)
-
-        # borramos registro anterior si existia
+    max_intentos = 10
+    for intento in range(1, max_intentos + 1):
         try:
-            ns.remove("tickets.frontend")
-        except Exception:
-            pass
+            daemon_kwargs: dict[str, Any] = {"host": "0.0.0.0"}
+            if PYRO_NAT_HOST:
+                daemon_kwargs["nathost"] = PYRO_NAT_HOST
+            daemon = Pyro4.Daemon(**daemon_kwargs)
 
-        ns.register("tickets.frontend", uri)
+            ns = Pyro4.locateNS(host=PYRO_NS_HOST, port=PYRO_NS_PORT)
 
-        print("Frontend Pyro listo: tickets.frontend")
-        print(f"URI: {uri}")
+            frontend = TicketFrontend()
+            uri = daemon.register(frontend)
 
-        # aqui se queda esperando llamadas rpc
-        daemon.requestLoop()
+            try:
+                ns.remove("tickets.frontend")
+            except Exception:
+                pass
 
-    except Exception as e:
-        print(f"Error arrancando el frontend: {e}")
+            ns.register("tickets.frontend", uri)
+
+            print("Frontend Pyro listo: tickets.frontend")
+            print(f"URI: {uri}")
+
+            daemon.requestLoop()
+            return
+
+        except Exception as e:
+            print(f"Intento {intento}/{max_intentos} - Error arrancando el frontend: {e}")
+            time.sleep(2)
+
+    print("No se pudo arrancar el frontend tras varios intentos. Saliendo.")
+    sys.exit(1)
 
 
 if __name__ == "__main__":
